@@ -25,7 +25,7 @@ const weekdays = ["sunday", "monday", "tuesday", "wednesday", "thursday", "frida
 const months = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
 const monthNames = months.flatMap((month) => [month, month.slice(0, 3)]).join("|");
 
-function localDateAt(timestamp: number, timeZone: string): string {
+export function localDateAt(timestamp: number, timeZone: string): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone,
     year: "numeric",

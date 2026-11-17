@@ -46,6 +46,8 @@ test("shortlist entities retain their order and enforce the stated cardinality",
     assert.deepEqual(recalled.episodes[0]?.entities.map((entity) => entity.display_name), [
       "AcmeCRM", "BrightDesk", "CopperLeaf", "DeskNest", "Everflow",
     ]);
+    const textRecall = recallByInterval(db, "demo-conversation", anchor!.primary, "We shortlisted these five CRMs");
+    assert.equal(textRecall.episodes[0]?.id, "demo-episode-crm");
     const entityRecall = recallByInterval(db, "demo-conversation", anchor!.primary, "Copper");
     assert.equal(entityRecall.episodes[0]?.id, "demo-episode-crm");
   } finally {

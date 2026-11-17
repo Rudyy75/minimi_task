@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 const migrations = [
   ["001_initial", new URL("../../src/memory/migrations/001_initial.sql", import.meta.url)],
   ["002_embeddings", new URL("../../src/memory/migrations/002_embeddings.sql", import.meta.url)],
+  ["003_immutable_observations", new URL("../../src/memory/migrations/003_immutable_observations.sql", import.meta.url)],
 ] as const;
 
 export function openDatabase(path: string): Database.Database {

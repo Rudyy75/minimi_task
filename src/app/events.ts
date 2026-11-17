@@ -1,6 +1,8 @@
 export type ServerEvent =
   | { type: "run_started"; runId: string }
-  | { type: "anchor_resolved"; disclosure: string | null }
+  | { type: "run_state"; state: string }
+  | { type: "clarify"; question: string }
+  | { type: "anchor_resolved"; disclosure: string | null; interval?: { localStart: string; localEndExclusive: string; startUtc: string; endUtcExclusive: string } }
   | { type: "memory_found"; episodeTitle: string; entityNames: string[] }
   | { type: "tool_started"; callId: string; query: string; wave: number }
   | { type: "tool_finished"; callId: string; status: string; latencyMs: number }

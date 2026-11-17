@@ -60,13 +60,13 @@ export function recallByInterval(
   const terms = ftsQuery(query);
   let rankedIds: string[] = [];
   if (terms && episodes.length) {
-    const matching = db.prepare(`SELECT et.episode_id, MIN(bm25(turn_fts)) AS rank
+    const matching = db.prepare(`SELECT et.episode_id, bm25(turn_fts) AS rank
       FROM turn_fts JOIN episode_turns et ON et.turn_id = turn_fts.turn_id
       JOIN episodes ep ON ep.id = et.episode_id
       WHERE turn_fts MATCH ? AND ep.conversation_id = ?
         AND ep.occurred_at_ms >= ? AND ep.occurred_at_ms < ?
-      GROUP BY et.episode_id ORDER BY rank`).all(terms, conversationId, interval.startMs, interval.endMsExclusive) as { episode_id: string }[];
-    rankedIds = matching.map(({ episode_id }) => episode_id);
+      ORDER BY rank`).all(terms, conversationId, interval.startMs, interval.endMsExclusive) as { episode_id: string }[];
+    rankedIds = [...new Set(matching.map(({ episode_id }) => episode_id))];
   }
 
   const entitiesByEpisode = new Map(episodes.map((episode) => {
