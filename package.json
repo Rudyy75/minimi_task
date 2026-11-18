@@ -7,7 +7,9 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "test": "tsx --test test/*.test.ts",
-    "seed:demo": "tsx eval/seed-demo.ts"
+    "seed:demo": "tsx eval/seed-demo.ts",
+    "eval": "tsc -p eval/tsconfig.json && node dist-eval/eval/run.js",
+    "eval:live": "tsc -p eval/tsconfig.json && node dist-eval/eval/live.js"
   },
   "dependencies": {
     "@fastify/static": "^8.2.0",

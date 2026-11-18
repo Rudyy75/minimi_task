@@ -74,6 +74,23 @@ export function validateClaim(input: unknown, evidence: readonly EvidenceExcerpt
     if (reference.quoteEnd > source.snippet.length || source.snippet.slice(reference.quoteStart, reference.quoteEnd) !== reference.quote) {
       throw new Error(`Quote span does not match evidence ${reference.evidenceId}`);
     }
+    if (reference.stance !== "supports") continue;
+    const quote = reference.quote.toLowerCase();
+    const contains = (value: string) => quote.includes(value.toLowerCase());
+    if (candidate.value.kind === "price" && (!contains(candidate.value.amountDecimal) || !contains(candidate.value.currency) || !contains(candidate.value.plan))) {
+      throw new Error(`Price claim is not supported by evidence ${reference.evidenceId}`);
+    }
+    if (candidate.value.kind === "plan_limit" && (!contains(candidate.value.valueDecimal) || !contains(candidate.value.unit) || !contains(candidate.value.plan) || !contains(candidate.value.limitName))) {
+      throw new Error(`Plan limit claim is not supported by evidence ${reference.evidenceId}`);
+    }
+    const stateCue = candidate.value.kind === "feature_state" && {
+      announced: /\b(announced|coming soon)\b/i.test(reference.quote), beta: /\b(beta|preview)\b/i.test(reference.quote), ga: /\b(ga|available|includes|generally available)\b/i.test(reference.quote),
+      deprecated: /\bdeprecated\b/i.test(reference.quote), removed: /\bremoved\b/i.test(reference.quote),
+    }[candidate.value.state];
+    if (candidate.value.kind === "feature_state" && (!contains(candidate.value.feature.replaceAll("_", " ")) || !stateCue ||
+      candidate.value.planScope.some((plan) => plan !== "unknown" && !contains(plan)))) {
+      throw new Error(`Feature claim is not supported by evidence ${reference.evidenceId}`);
+    }
   }
   const { identityKey, comparabilityKey } = keys(candidate.entityId, candidate.predicate, candidate.value);
   const claim = {
@@ -85,7 +102,7 @@ export function validateClaim(input: unknown, evidence: readonly EvidenceExcerpt
   return { ...claim, claimHash: createHash("sha256").update(JSON.stringify(claim)).digest("hex") };
 }
 
-export function createBackfillClaim(input: Omit<Parameters<typeof validateClaim>[0], "evidence" | "extraction"> & { extraction?: never }): Claim {
+export function createBackfillClaim(input: { entityId: string | null; predicate: Claim["predicate"]; value: ClaimValue; observedAtUtc: string; effectiveAtUtc: string | null }): Claim {
   return validateClaim({ ...input, extraction: { method: "backfill", confidence: 0.35 }, evidence: [] }, []);
 }
 

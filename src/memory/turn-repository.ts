@@ -3,6 +3,8 @@ import type Database from "better-sqlite3";
 import type { RequestContext } from "../app/context.js";
 import { localDateAt, resolveAnchor, type ResolvedAnchor } from "../time/resolve-anchor.js";
 import { saveAnchor } from "./anchor-repository.js";
+import { saveSnapshot } from "./snapshot-repository.js";
+import type { Claim } from "../verify/claims.js";
 
 export interface SavedTurn {
   id: string;
@@ -11,6 +13,25 @@ export interface SavedTurn {
   createdAtUtc: string;
   createdAtMs: number;
   timeZone: string;
+}
+
+export function saveAssistantAnswer(db: Database.Database, context: RequestContext, input: { requestTurnId: string; runId: string; content: string; episodeId?: string | null; claims?: readonly Claim[] }): string {
+  const id = randomUUID();
+  const digest = createHash("sha256").update(input.content).digest("hex");
+  db.transaction(() => {
+    const seq = (db.prepare("SELECT COALESCE(MAX(seq), 0) + 1 AS seq FROM turns WHERE conversation_id = (SELECT conversation_id FROM turns WHERE id = ?)").get(input.requestTurnId) as { seq: number }).seq;
+    db.prepare(`INSERT INTO turns (id, conversation_id, seq, role, content, created_at_utc, created_at_ms, completed_at_ms, time_zone, local_date, status, run_id, content_sha256)
+      SELECT ?, conversation_id, ?, 'assistant', ?, ?, ?, ?, ?, ?, 'committed', ?, ? FROM turns WHERE id = ?`)
+      .run(id, seq, input.content, context.nowUtc, context.nowMs, context.nowMs, context.timeZone, localDateAt(context.nowMs, context.timeZone), input.runId, digest, input.requestTurnId);
+    db.prepare("INSERT INTO turn_fts (turn_id, content) VALUES (?, ?)").run(id, input.content);
+    if (input.episodeId) db.prepare("INSERT INTO episode_turns (episode_id, turn_id, relation) VALUES (?, ?, 'answer')").run(input.episodeId, id);
+    saveSnapshot(db, { episodeId: input.episodeId, answerTurnId: id, answer: input.content, capturedAtUtc: context.nowUtc, claims: input.claims ?? [] });
+  }).immediate();
+  return id;
+}
+
+export function markTurnPartial(db: Database.Database, turnId: string): void {
+  db.prepare("UPDATE turns SET status = 'partial' WHERE id = ? AND status = 'committed'").run(turnId);
 }
 
 export function saveUserTurn(db: Database.Database, context: RequestContext, input: { userId: string; content: string; clientMessageId?: string; runId: string }): SavedTurn {

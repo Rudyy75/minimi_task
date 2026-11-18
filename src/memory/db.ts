@@ -1,5 +1,5 @@
 import Database from "better-sqlite3";
-import { mkdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -20,7 +20,8 @@ export function openDatabase(path: string): Database.Database {
   db.exec("CREATE TABLE IF NOT EXISTS schema_migrations (id TEXT PRIMARY KEY, applied_at_utc TEXT NOT NULL)");
   for (const [id, url] of migrations) {
     if (db.prepare("SELECT 1 FROM schema_migrations WHERE id = ?").get(id)) continue;
-    const migration = readFileSync(fileURLToPath(url), "utf8");
+    const sourceUrl = existsSync(fileURLToPath(url)) ? url : new URL(`../../../src/memory/migrations/${id}.sql`, import.meta.url);
+    const migration = readFileSync(fileURLToPath(sourceUrl), "utf8");
     db.transaction(() => {
       db.exec(migration);
       db.prepare("INSERT INTO schema_migrations (id, applied_at_utc) VALUES (?, ?)").run(id, new Date().toISOString());

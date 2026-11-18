@@ -13,6 +13,8 @@ const schema = z.object({
   TIME_ZONE: z.string().default("UTC"),
   LOCALE: z.string().default("en-US"),
   TAVILY_API_KEY: z.string().optional(),
+  OPENAI_API_KEY: z.string().optional(),
+  OPENAI_MODEL: z.string().default("gpt-6-luna"),
 });
 
 export const config = schema.parse(process.env);

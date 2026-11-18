@@ -1,0 +1,61 @@
+{
+  "fixedNow": "2026-11-17T18:00:00.000Z",
+  "metrics": {
+    "anchorAccuracy": {
+      "passed": 5,
+      "total": 5,
+      "rate": 1
+    },
+    "episodeRecall": {
+      "recalled": 1,
+      "expected": 1,
+      "rate": 1
+    },
+    "entityRecall": {
+      "recalled": 5,
+      "expected": 5,
+      "rate": 1
+    },
+    "multipleEpisodesOnDate": 2,
+    "diffPrecision": {
+      "truePositive": 1,
+      "falsePositive": 0,
+      "rate": 1
+    },
+    "diffRecall": {
+      "truePositive": 1,
+      "falseNegative": 0,
+      "rate": 1
+    },
+    "falseAllClear": {
+      "falseAllClear": 0,
+      "cases": 1,
+      "rate": 0
+    },
+    "citationValidity": {
+      "validEmitted": 1,
+      "emitted": 1,
+      "inventedCitationRejected": true,
+      "rate": 1
+    },
+    "maximumSearchConcurrency": 5,
+    "concurrentFiveSearchElapsedMs": 27,
+    "timeoutPartialFailurePreserved": true,
+    "duplicateClientMessageIdIdempotent": true,
+    "missingBaselineStatus": "unverified",
+    "injectionSnippetQuotedVerbatim": true,
+    "injectedLLMPortCalls": 1
+  },
+  "edgeCases": [
+    "last Tuesday on Tuesday",
+    "3 November in January",
+    "spring DST",
+    "fall DST",
+    "multiple episodes same date",
+    "prompt injection",
+    "invented citation",
+    "search timeout",
+    "duplicate client_message_id",
+    "missing T0 baseline"
+  ]
+}

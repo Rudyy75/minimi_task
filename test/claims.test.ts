@@ -2,13 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { BACKFILL_DISCLOSURE, createBackfillClaim, validateClaim } from "../src/verify/claims.js";
 
-const snippet = "AcmeCRM Basic costs $12.50 per seat per month.";
+const snippet = "AcmeCRM Basic costs USD 12.50 per seat per month.";
 const candidate = {
   entityId: "acmecrm", predicate: "plan.price",
   value: { kind: "price", plan: "Basic", amountDecimal: "12.50", currency: "USD", basis: "seat", interval: "month", billing: "monthly", usageUnit: null, minimumSeats: null, region: null },
   observedAtUtc: "2026-11-17T12:00:00.000Z", effectiveAtUtc: null,
   extraction: { method: "model_validated", confidence: 0.8 },
-  evidence: [{ evidenceId: "ev1", stance: "supports", quote: "AcmeCRM Basic costs $12.50", quoteStart: 0, quoteEnd: 26 }],
+  evidence: [{ evidenceId: "ev1", stance: "supports", quote: "AcmeCRM Basic costs USD 12.50", quoteStart: 0, quoteEnd: 29 }],
 };
 
 test("validated claims use decimal strings, normalize keys, and require exact stored quote spans", () => {
@@ -20,6 +20,7 @@ test("validated claims use decimal strings, normalize keys, and require exact st
   assert.throws(() => validateClaim({ ...candidate, evidence: [{ ...candidate.evidence[0], quote: "AcmeCRM Basic costs $99.99" }] }, [{ id: "ev1", snippet }]), /Quote span/);
   assert.throws(() => validateClaim({ ...candidate, value: { ...candidate.value, amountDecimal: 12.5 } }, [{ id: "ev1", snippet }]));
   assert.throws(() => validateClaim({ ...candidate, value: { ...candidate.value, currency: "ZZZ" } }, [{ id: "ev1", snippet }]));
+  assert.throws(() => validateClaim({ ...candidate, value: { ...candidate.value, amountDecimal: "99.99" } }, [{ id: "ev1", snippet }]), /not supported/);
 });
 
 test("prose-reconstructed claims are marked backfill and carry an explicit disclosure", () => {

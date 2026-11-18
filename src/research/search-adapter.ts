@@ -101,8 +101,15 @@ export function createDemoSearchPort(clock: Clock): FixtureSearchPort {
   const fixtures = new Map<string, SearchResult[]>(products.map((product, index) => [
     `${product} official pricing`,
     [{ title: `${product} demo pricing`, url: `https://demo.example/${product.toLowerCase()}/pricing`,
-      snippet: `Demo fixture only: ${product} Basic is $${[21, 12, 15, 18, 24][index]} per user per month.`,
+      snippet: `Demo fixture only: ${product} ${product === "BrightDesk" ? "Standard" : "Basic"} is USD ${[21, 12, 15, 18, 24][index]} per user per month.`,
       publishedAtUtc: null, publishedPrecision: null, rawPayload: { source: "demo_fixture" } }],
   ]));
+  for (const [product, plan, amount, interval] of [["NeonDB", "Launch", "24", "month"], ["RiverPostgres", "Starter", "12", "month"], ["CloudBase", "Entry", "18", "month"]]) {
+    fixtures.set(`${product} official pricing`, [{ title: `${product} demo pricing`, url: `https://demo.example/${product.toLowerCase()}/pricing`,
+      snippet: `Demo fixture only: ${product} ${plan} is USD ${amount} per instance per ${interval}.`,
+      publishedAtUtc: null, publishedPrecision: null, rawPayload: { source: "demo_fixture" } }]);
+  }
+  fixtures.set("AcmeCRM official release notes features", [{ title: "AcmeCRM demo release notes", url: "https://demo.example/acmecrm/releases",
+    snippet: "Demo fixture only: AcmeCRM Standard includes audit logs (GA).", publishedAtUtc: null, publishedPrecision: null, rawPayload: { source: "demo_fixture" } }]);
   return new FixtureSearchPort(fixtures, clock);
 }

@@ -9,8 +9,12 @@
   <body>
     <main>
       <header><span class="mark">M</span><div><h1>minimi</h1><p>Temporal verification agent</p></div><span id="status">offline</span></header>
-      <section><h2>Run trace</h2><div id="trace" aria-live="polite"><span class="pill">Waiting for connection</span></div></section>
-      <button id="connect">Connect to event stream</button>
+      <section><h2>Ask minimi</h2><form id="chat"><label for="message">Message</label><textarea id="message" rows="3" placeholder="What changed in the CRM shortlist from Monday?" required></textarea><button>Send</button></form>
+        <div class="benchmarks"><button data-prompt="What changed in the CRM shortlist from Monday?">CRM shortlist</button><button data-prompt="Recheck the November 3 audit log and pricing claims.">November 3</button><button data-prompt="What changed in last Tuesday's Postgres hosting comparison?">Postgres hosting</button></div></section>
+      <section><h2>Answer</h2><div id="answer" aria-live="polite">Ready when you are.</div></section>
+      <section><h2>Coverage</h2><div id="coverage" aria-live="polite">No verification run yet.</div></section>
+      <section><h2>Verdicts</h2><div class="table-wrap"><table><thead><tr><th>Entity</th><th>T0</th><th>T1</th><th>Status</th><th>Confidence</th><th>Citations</th></tr></thead><tbody id="verdicts"></tbody></table></div></section>
+      <section><h2>Run trace</h2><div id="trace" aria-live="polite"><span class="pill">Ready</span></div></section>
     </main>
     <script type="module" src="/app.js"></script>
   </body>

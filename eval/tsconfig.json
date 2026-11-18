@@ -1,0 +1,8 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "..",
+    "outDir": "../dist-eval"
+  },
+  "include": ["../src/**/*.ts", "./run.ts", "./live.ts"]
+}

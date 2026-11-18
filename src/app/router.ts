@@ -19,7 +19,7 @@ export function buildSearchWaves(prompt: string, route: Route, entities: readonl
   if (route !== "VERIFY_TEMPORAL" && route !== "RESEARCH_MULTI_ENTITY") return [];
   const names = [...new Set(entities)].slice(0, 5);
   const wave1 = (names.length ? names.map((name) => ({ query: `${name} official pricing`, wave: 1 as const })) : [{ query: prompt, wave: 1 as const }]);
-  const wave2 = /\b(shipped|launch|release|feature)\b/i.test(prompt)
+  const wave2 = /\b(shipped|launch|release|feature|audit\s+logs?|plan\s+limits?)\b/i.test(prompt)
     ? names.slice(0, 5).map((name) => ({ query: `${name} official release notes features`, wave: 2 as const }))
     : [];
   return [wave1, ...(wave2.length ? [wave2] : [])];

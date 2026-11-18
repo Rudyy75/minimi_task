@@ -8,19 +8,21 @@ import { createRequestContext } from "./app/context.js";
 import type { ServerEvent } from "./app/events.js";
 import { openDatabase } from "./memory/db.js";
 import { seedDemo } from "./memory/seed-demo.js";
-import { captureLiveEpisode, saveUserTurn } from "./memory/turn-repository.js";
+import { captureLiveEpisode, markTurnPartial, saveAssistantAnswer, saveUserTurn } from "./memory/turn-repository.js";
 import { recallByInterval } from "./memory/recall.js";
 import { saveAnchor } from "./memory/anchor-repository.js";
 import { routePrompt, buildSearchWaves } from "./app/router.js";
 import { RunStateMachine } from "./app/state-machine.js";
 import { createDemoSearchPort, TavilySearchPort } from "./research/search-adapter.js";
 import { SearchRunner } from "./research/search-runner.js";
+import { OpenAIResponsesPort } from "./research/llm-adapter.js";
 import { resolveAnchor } from "./time/resolve-anchor.js";
 import { systemClock } from "./time/clock.js";
+import { verifySearchResults } from "./verify/pipeline.js";
 
 const app = Fastify({ logger: true });
 const chatRequest = z.object({
-  conversationId: z.string().uuid().optional(),
+  conversationId: z.string().min(1).max(200).optional(),
   clientMessageId: z.string().min(1).max(200).optional(),
   message: z.string().trim().min(1).max(20_000).optional(),
 }).optional();
@@ -31,6 +33,7 @@ const searchPort = config.TAVILY_API_KEY
   ? new TavilySearchPort(config.TAVILY_API_KEY, systemClock)
   : createDemoSearchPort(systemClock);
 const searchRunner = new SearchRunner(db, searchPort, systemClock);
+const llm = config.OPENAI_API_KEY ? new OpenAIResponsesPort(config.OPENAI_API_KEY, config.OPENAI_MODEL) : undefined;
 await app.register(fastifyStatic, { root: publicDir });
 
 app.get("/api/health", async () => ({ ok: true }));
@@ -90,22 +93,60 @@ app.post("/api/chat", async (request, reply) => {
 
   if (turn && route === "CLARIFY") {
     setState("clarify");
-    send({ type: "clarify", question: anchor?.disclosure ?? "I couldn't find a matching conversation. Which date or comparison do you mean?" });
+    const question = anchor?.disclosure ?? "I couldn't find a matching conversation. Which date or comparison do you mean?";
+    const answerTurnId = saveAssistantAnswer(db, context, { requestTurnId: turn.id, runId, content: question });
+    send({ type: "clarify", question });
+    send({ type: "answer_final", answerTurnId, answer: question, coverage: { inScope: 0, fullyChecked: 0, unverified: 0, conflicting: 0 } });
+    setState("committed");
   } else if (turn && route === "MEMORY_LOOKUP") {
     setState("fast_answer");
     for (const episode of recalled?.episodes ?? []) send({ type: "memory_found", episodeTitle: episode.title, entityNames: episode.entities.map((entity) => entity.display_name) });
-    for (const item of recalled?.turns ?? []) send({ type: "answer_delta", text: item.content });
+    const answer = recalled?.turns.length ? recalled.turns.map((item) => item.content).join("\n") : "I couldn't find a matching saved question in that time window.";
+    const answerTurnId = saveAssistantAnswer(db, context, { requestTurnId: turn.id, runId, content: answer, episodeId: recalled?.episodes[0]?.id });
+    send({ type: "answer_delta", text: answer });
+    send({ type: "answer_final", answerTurnId, answer, coverage: { inScope: recalled?.turns.length ?? 0, fullyChecked: 0, unverified: 0, conflicting: 0 } });
+    setState("committed");
   } else if (turn && (route === "VERIFY_TEMPORAL" || route === "RESEARCH_MULTI_ENTITY")) {
-    const entityNames = (recalled?.episodes ?? []).flatMap((episode) => episode.entities.map((entity) => entity.display_name));
+    const episodeIds = (recalled?.episodes ?? []).map(({ id }) => id);
+    const entities = (recalled?.episodes ?? []).flatMap((episode) => episode.entities);
+    const entityNames = entities.map((entity) => entity.display_name);
+    const entityIds = new Map(entities.map((entity) => [entity.display_name.toLowerCase(), entity.id]));
     const waves = buildSearchWaves(turn.content, route, entityNames);
     setState("planned");
     setState("searching");
     const outcome = await searchRunner.run({ requestTurnId: turn.id, runId, waves, signal: abortController.signal, onEvent: send });
-    if (abortController.signal.aborted) setState("cancelled");
-    else if (outcome.failures.length) setState("degraded");
-    else setState("extracting");
+    if (abortController.signal.aborted) { markTurnPartial(db, turn.id); setState("cancelled"); }
+    else {
+      setState("extracting");
+      try {
+        await verifySearchResults(db, { context, requestTurnId: turn.id, runId, question: turn.content,
+          episodeIds, entityIds, results: outcome.results, providerFailures: outcome.failures, llm,
+          signal: AbortSignal.any([abortController.signal, AbortSignal.timeout(8_000)]), send });
+        setState(outcome.failures.length ? "degraded" : "committed");
+        if (outcome.failures.length) setState("committed");
+      } catch (error) {
+        if (abortController.signal.aborted) { markTurnPartial(db, turn.id); setState("cancelled"); }
+        else {
+          send({ type: "run_failed", recoverableMessage: error instanceof Error ? error.message : "Verification failed" });
+          setState("degraded");
+          setState("committed");
+        }
+      }
+    }
+  } else if (turn) {
+    setState("fast_answer");
+    let answer = "I can recall a saved conversation or verify a dated comparison. Include a date or name the shortlist you want me to check.";
+    if (llm) {
+      try { answer = await llm.complete(`Answer the user's general question clearly. Do not claim to have searched or verified current facts. If the user asks for current information, ask them to use a dated verification request.\n\nUser: ${turn.content}`, AbortSignal.any([abortController.signal, AbortSignal.timeout(8_000)])); }
+      catch { if (abortController.signal.aborted) { markTurnPartial(db, turn.id); setState("cancelled"); return; } }
+    }
+    const answerTurnId = saveAssistantAnswer(db, context, { requestTurnId: turn.id, runId, content: answer });
+    send({ type: "answer_delta", text: answer });
+    send({ type: "answer_final", answerTurnId, answer, coverage: { inScope: 0, fullyChecked: 0, unverified: 0, conflicting: 0 } });
+    setState("committed");
   }
-  if (!response.destroyed) send({ type: "heartbeat", at: context.nowUtc });
+  clearInterval(timer);
+  if (!response.destroyed) response.end();
 });
 
 app.addHook("onClose", async () => db.close());
